@@ -63,7 +63,7 @@ for process_class in all_process_classes:
     PS_point, jacobian = ps_generator.generateKinematics(this_process_E_cm, random_variables)
     
     print("> PS point:")
-    #print(PS_point)
+    print(PS_point)
     print("> Matrix element evaluation : %s%.16e%s"%(Colour.GREEN,process.smatrix(PS_point, active_model),Colour.END))
     print("")
 

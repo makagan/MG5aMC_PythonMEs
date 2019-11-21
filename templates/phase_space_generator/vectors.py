@@ -256,23 +256,26 @@ class LorentzVectorDict(dict):
         )
         line = '-' * (sum(cols_widths) + len(cols_widths) - 1)
 
+
         out_lines = [template % ('#', ' E', ' p_x', ' p_y', ' p_z', ' M',)]
         out_lines.append(line)
         running_sum = LorentzVector()
+        
         for i in sorted(self.keys()):
             mom = LorentzVector(self[i])
+            mom_list = [mom[0], mom[1], mom[2], mom[3], math.sqrt(abs(mom.square()))]
             if i <= n_initial:
                 running_sum += mom
             else:
                 running_sum -= mom
-            out_lines.append(template % tuple(
-                ['%d' % i] + [
-           special_float_format(el) for el in (list(mom) + [math.sqrt(abs(mom.square()))])
-                ]
-            ))
+            ###out_lines.append(template % tuple(['%d' % i] + [special_float_format(el) for el in (list(mom) + [math.sqrt(abs(mom.square()))])]))
+            out_lines.append(template % tuple(['%d' % i] + [special_float_format(el) for el in mom_list]))
+            
         out_lines.append(line)
+
+        running_sum_list = [running_sum[0], running_sum[1], running_sum[2], running_sum[3]]
         out_lines.append(template % tuple(
-            ['Sum'] + [special_float_format(el) for el in running_sum] + ['']
+            ['Sum'] + [special_float_format(el) for el in running_sum_list] + ['']
         ))
 
         return '\n'.join(out_lines)
