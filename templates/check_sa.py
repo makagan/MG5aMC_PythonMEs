@@ -35,7 +35,7 @@ E_cm = 14000.
 print("")
 print("The module '%s' contains %d processes"%(module_name, len(all_process_classes)))
 print("")
-#print(str(active_model))
+print(str(active_model))
 print("")
 
 for process_class in all_process_classes:

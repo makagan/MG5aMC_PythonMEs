@@ -201,8 +201,11 @@ class UFOModelConverterPython(export_cpp.UFOModelConverterCPP):
 
         file_py = self.generate_parameters_class_files()
 
+        file_py = file_py.replace("import cmath\n",
+                                      "import monkey_patch as cmath\nfrom monkey_patch import complex\n")
+
         # Write the files
-        parameters_file.write(file_py.replace("import cmath\n","import monkey_patch as cmath\nfrom monkey_patch import complex\n"))
+        parameters_file.write(file_py)
         parameters_file.close()
 
         logger.info("Created parameters python file %s."%parameters_file_path)
@@ -293,7 +296,10 @@ class UFOModelConverterPython(export_cpp.UFOModelConverterCPP):
 
         res_strings = []
         for param in params:
-            res_strings.append("%sres.append('{:<20s} = {:<20.16e}'.format('%s',self.%s))" % (' '*indent, param.name, param.name))
+            if param.type=="complex":
+                res_strings.append("%sres.append('{:<20s} = {:<20.16e}'.format('%s',self.%s[0]))" % (' '*indent, param.name, param.name))
+            else:
+                res_strings.append("%sres.append('{:<20s} = {:<20.16e}'.format('%s',self.%s))" % (' '*indent, param.name, param.name))
  
         return "\n".join(res_strings)
 
