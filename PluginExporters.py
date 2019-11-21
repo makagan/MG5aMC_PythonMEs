@@ -202,7 +202,7 @@ class UFOModelConverterPython(export_cpp.UFOModelConverterCPP):
         file_py = self.generate_parameters_class_files()
 
         # Write the files
-        parameters_file.write(file_py)
+        parameters_file.write(file_py.replace("import cmath\n","import monkey_patch as cmath\nfrom monkey_patch import complex\n"))
         parameters_file.close()
 
         logger.info("Created parameters python file %s."%parameters_file_path)
@@ -307,11 +307,24 @@ class UFOModelConverterPython(export_cpp.UFOModelConverterCPP):
         self.aloha_model.compute_subset(self.wanted_lorentz)
         # Write out the aloha routines in Python
         aloha_routines = []
+
+
+        # step zero, copy over monkey_patch
+        monkey_patch = open(pjoin(plugin_path,'templates','monkey_patch.py'),'r').read()
+        open(pjoin(self.dir_path,'monkey_patch.py'),'w').write(monkey_patch)
         
         # First add the default external wavefunction routines
-        wavefunction_routines = open(pjoin(MG5DIR,'aloha','template_files','wavefunctions.py'),'r').read() 
-        open(pjoin(self.dir_path,'wavefunctions.py'),'w').write(
-            'from __future__ import division\n'+wavefunction_routines)
+        wavefunction_routines = open(pjoin(MG5DIR,'aloha','template_files','wavefunctions.py'),'r').read()
+
+        _wf = wavefunction_routines.replace("= +", "= ")
+        _wf = _wf.replace("from math import sqrt, pow\n","from monkey_patch import sqrt, pow, complex, max\n")
+        _wf = _wf.replace("= -1*complex","= -1.0*complex")
+        _wf = _wf.replace("complex(-","complex(-1.0*")
+        
+        open(pjoin(self.dir_path,'wavefunctions.py'),'w').write(_wf)
+        
+        ###open(pjoin(self.dir_path,'wavefunctions.py'),'w').write(
+        ###    'from __future__ import division\n'+wavefunction_routines)
 
         #aloha_routines.append(open(pjoin(MG5DIR,'aloha','template_files','wavefunctions.py'),'r').read())
 
@@ -335,7 +348,7 @@ class UFOModelConverterPython(export_cpp.UFOModelConverterCPP):
                     if line not in python_imports:
                         python_imports.append(line)
                 else:
-                    new_aloha_routine.append(line)
+                    new_aloha_routine.append(line.replace("= +","= ").replace("-complex","-1.0*complex"))
             new_aloha_routines.append('\n'.join(new_aloha_routine))
         aloha_routines = new_aloha_routines
        
@@ -346,8 +359,10 @@ class UFOModelConverterPython(export_cpp.UFOModelConverterCPP):
 
         aloha_output = open(pjoin(self.dir_path,'aloha_methods.py'),'w')
         aloha_output.write('from __future__ import division\n')
+        aloha_output.write('import wavefunctions\n')
+        aloha_output.write('from monkey_patch import complex\n')
         # Write imports
-        aloha_output.write('\n'.join(python_imports))
+        ###aloha_output.write('\n'.join(python_imports))
         aloha_output.write('\n'*2)
 
         # Write routines
@@ -544,6 +559,13 @@ sys.path.insert(0, root_path)
         
         shutil.copytree( pjoin(plugin_path, 'templates','phase_space_generator'), 
                      pjoin(self.export_dir,'phase_space_generator') )
+
+        #Hack to get rid of unary+ operations
+        ph_sp_gen = open(pjoin(self.export_dir,'phase_space_generator','flat_phase_space_generator.py'),'r').read()
+        open(pjoin(self.export_dir,
+                       'phase_space_generator',
+                       'flat_phase_space_generator.py'),'w').write(ph_sp_gen.replace("= +","= ").replace(", +",", 1.0*").replace(", -",", (-1.0)*"))
+        
         os.makedirs(pjoin(self.export_dir, 'processes'))
         open(pjoin(self.export_dir,'processes','__init__.py'),'w')
         all_processes = open(pjoin(self.export_dir, 'processes','all_processes.py'),'w')
@@ -569,9 +591,20 @@ sys.path.insert(0, root_path)
 
         self.all_MEs.extend(['Matrix_%s'%key for key in matrix_methods])
 
-        all_processes = open(pjoin(self.export_dir, 'processes','all_processes.py'),'a')                            
-        all_processes.write('\n'.join(matrix_methods.values()))
-        all_processes.write('\n')
+
+        all_processes = open(pjoin(self.export_dir, 'processes','all_processes.py'),'a')
+        for key, val in matrix_methods.items():
+            denom = val[val.find("denom =") : val.find(";", val.find("denom ="))]
+            new_denom = denom[0:denom.find("]")] + "." + denom[denom.find("]"):]
+
+            cf = val[val.find("cf =") : val.find(";", val.find("cf ="))]
+            new_cf = cf[0:cf.find("]")] + "." + cf[cf.find("]"):]
+            
+            all_processes.write(val.replace("= +","= ").replace(denom, new_denom).replace(cf, new_cf))
+            all_processes.write('\n')
+            
+        ###all_processes.write('\n'.join(matrix_methods.values()))
+        ###all_processes.write('\n')
         all_processes.close()
 
         #for key, method in matrix_methods.items():

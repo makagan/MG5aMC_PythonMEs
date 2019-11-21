@@ -7,6 +7,8 @@ from processes.all_processes import *
 from model.parameters import ModelParameters
 from phase_space_generator.flat_phase_space_generator import FlatInvertiblePhasespace 
 
+import jax
+
 class Colour:
    PURPLE = '\033[95m'
    CYAN = '\033[96m'
@@ -33,7 +35,7 @@ E_cm = 14000.
 print("")
 print("The module '%s' contains %d processes"%(module_name, len(all_process_classes)))
 print("")
-print(str(active_model))
+#print(str(active_model))
 print("")
 
 for process_class in all_process_classes:
@@ -61,7 +63,14 @@ for process_class in all_process_classes:
     PS_point, jacobian = ps_generator.generateKinematics(this_process_E_cm, random_variables)
     
     print("> PS point:")
-    print(PS_point)
+    #print(PS_point)
     print("> Matrix element evaluation : %s%.16e%s"%(Colour.GREEN,process.smatrix(PS_point, active_model),Colour.END))
     print("")
 
+    #def matrix_element(process, PS_point, active_model):
+    #    return process.smatrix(PS_point, active_model)[0]
+
+    #matrix_element_prime = jax.grad(matrix_element)
+
+    #print("> Matrix element deriv : %s%.16e%s"%(Colour.GREEN,matrix_element_prime(process, PS_point, active_model),Colour.END))
+    #print("")
