@@ -1,0 +1,7 @@
+define ud=u d
+define udx=u~ d~
+define v = a z
+generate e+ e- > ud udx
+!rm -rf dijet 
+output Python dijet
+!cd dijet && ./check_sa.py

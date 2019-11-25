@@ -23,5 +23,7 @@ Note that for now the independent parameters of the model are hard-coded to thei
 
 ## Docker
 
+```
 docker run --rm -it -v $PWD/MG5aMC_PythonMEs:/code/madgraph/PLUGIN/MG5aMC_PythonMEs -v $PWD/data:/data -w /data lukasheinrich/diffmes bash
-$> /code/madgraph/bin/mg5_aMC --mode=MG5aMC_PythonMEs /code/madgraph/PLUGIN/MG5aMC_PythonMEs/test_MG5aMC_PythonMEs.mg5
+$> /code/madgraph/bin/mg5_aMC --mode=MG5aMC_PythonMEs example_cards/test_MG5aMC_PythonMEs.mg5
+```
