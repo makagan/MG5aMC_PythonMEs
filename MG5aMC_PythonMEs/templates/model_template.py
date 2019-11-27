@@ -12,11 +12,20 @@ class ParamCard(object):
                 "The feature of loading independent parameter values "
                 "from a param_card.dat file is not implemented yet.")
 
+        self.set_val = {}
+
     def get_block_entry(self, block_name, entry_id, default_value):
+
+        if (block_name,entry_id) in self.set_val.keys():
+            return self.set_val[ (block_name,entry_id) ]
 
         # In a future version we will retrieve this value from the param card.
         # For now simply always return the default value.
         return default_value
+
+    def set_block_entry(self, block_name, entry_id, set_value):
+        self.set_val[ (block_name,entry_id) ] = set_value
+        return
 
 class ModelParameters(object):
     """ This class contains the list of parameters of a physics model %(model_name)s and their definition."""
@@ -25,7 +34,10 @@ class ModelParameters(object):
         """ Instantiates using default value or the path of a SLHA param card."""
        
         # Param card accessor
-        slha = ParamCard(param_card)
+        if isinstance(param_card, ParamCard):
+            slha = param_card
+        else:
+            slha = ParamCard(param_card)
         
         self.ZERO = 0.
 

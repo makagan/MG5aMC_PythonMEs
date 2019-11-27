@@ -263,7 +263,8 @@ class UFOModelConverterPython(export_cpp.UFOModelConverterCPP):
         for param in params:
             # Not needed in Python, but kept for potential future use
             if param.type == 'real':
-                res_strings.append('%sself.%s = %s(%s.real)'%(' '*indent, param.name, self.type_dict[param.type], param.name))                
+                res_strings.append('%sself.%s = %s(%s.real)'%(' '*indent, param.name, '', param.name))      
+                #res_strings.append('%sself.%s = %s(%s.real)'%(' '*indent, param.name, self.type_dict[param.type], param.name))                
             else:
                 res_strings.append('%sself.%s = %s(%s)'%(' '*indent, param.name, self.type_dict[param.type], param.name))
 
@@ -354,7 +355,7 @@ class UFOModelConverterPython(export_cpp.UFOModelConverterCPP):
                     if line not in python_imports:
                         python_imports.append(line)
                 else:
-                    new_aloha_routine.append(line.replace("= +","= ").replace("-complex","-1.0*complex"))
+                    new_aloha_routine.append(line.replace("= +","= ").replace("-complex","-1.0*complex").replace("if (M3)","if (M3>0 or M3<0)"))
             new_aloha_routines.append('\n'.join(new_aloha_routine))
         aloha_routines = new_aloha_routines
        

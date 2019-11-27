@@ -4,7 +4,7 @@ import random
 import os
 
 from processes.all_processes import *
-from model.parameters import ModelParameters
+from model.parameters import ModelParameters, ParamCard
 from phase_space_generator.flat_phase_space_generator import FlatInvertiblePhasespace 
 
 import jax
@@ -67,10 +67,44 @@ for process_class in all_process_classes:
     print("> Matrix element evaluation : %s%.16e%s"%(Colour.GREEN,process.smatrix(PS_point, active_model),Colour.END))
     print("")
 
-    #def matrix_element(process, PS_point, active_model):
-    #    return process.smatrix(PS_point, active_model)[0]
+if False:
+    from processes.all_processes import Matrix_1_mupmum_epem
+    from phase_space_generator.flat_phase_space_generator import FlatInvertiblePhasespace, LorentzVectorList, LorentzVector
+    
+    def matrix_element(x,c):
+        e = 90.
+        theta = x
+        Z_mass = c
+        
+        pc = ParamCard()
+        pc.set_block_entry("mass", 23, Z_mass) #9.118800e+01
+        active_model = ModelParameters(pc)
+    
+    
+        process = Matrix_1_mupmum_epem()      
+    
+    
+        vectors = [
+            [e/2,0,0, e/2],
+            [e/2,0,0,-e/2],
+            [e/2.5, 0, e/2.5*jax.numpy.sin(theta), e/2*jax.numpy.cos(theta)],
+            [e/2.5, 0,-e/2.5*jax.numpy.sin(theta),-e/2*jax.numpy.cos(theta)],
+        ]
+            
+        PS_point = LorentzVectorList(LorentzVector(v) for v in vectors)
+        return process.smatrix(PS_point, active_model)[0]
 
-    #matrix_element_prime = jax.grad(matrix_element)
 
-    #print("> Matrix element deriv : %s%.16e%s"%(Colour.GREEN,matrix_element_prime(process, PS_point, active_model),Colour.END))
-    #print("")
+    matrix_element_prime = jax.grad(matrix_element, 1)
+    
+    print("ME", matrix_element(3.14159, 9.918800e+01))
+    print("ME again", matrix_element(3.14159, 8.018800e+01))
+    print("ME derivative:", matrix_element_prime( 3.14159, 9.918800e+01 ))
+    
+    
+    def first_finite_differences(f, x, c):
+        eps = 1e-3
+        return jax.numpy.array([(f(x, c + eps * v) - f(x, c - eps * v)) / (2 * eps)
+                                for v in jax.numpy.eye(len([c]))])
+    
+    print( first_finite_differences(matrix_element, 3.14159, 9.918800e+01) )

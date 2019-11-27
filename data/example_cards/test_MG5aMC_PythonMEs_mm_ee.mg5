@@ -1,0 +1,7 @@
+define ud=u d
+define udx=u~ d~
+define v = a z
+generate mu+ mu- > e+ e- @1
+!rm -rf MG5aMC_PythonMEs_output_example 
+output Python MG5aMC_PythonMEs_output_example
+!cd MG5aMC_PythonMEs_output_example && ./check_sa.py
