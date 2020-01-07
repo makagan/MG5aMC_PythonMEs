@@ -321,14 +321,19 @@ class UFOModelConverterPython(export_cpp.UFOModelConverterCPP):
         open(pjoin(self.dir_path,'monkey_patch.py'),'w').write(monkey_patch)
         
         # First add the default external wavefunction routines
-        wavefunction_routines = open(pjoin(MG5DIR,'aloha','template_files','wavefunctions.py'),'r').read()
-
-        _wf = wavefunction_routines.replace("= +", "= ")
-        _wf = _wf.replace("from math import sqrt, pow\n","from monkey_patch import sqrt, pow, complex, max\n")
-        _wf = _wf.replace("= -1*complex","= -1.0*complex")
-        _wf = _wf.replace("complex(-","complex(-1.0*")
-        
-        open(pjoin(self.dir_path,'wavefunctions.py'),'w').write(_wf)
+        copy_wf_template = True
+        if copy_wf_template:
+            wavefunction_routines = open(pjoin(plugin_path,'templates','wavefunctions.py'),'r').read()
+            open(pjoin(self.dir_path,'wavefunctions.py'),'w').write(wavefunction_routines)
+        else:
+            wavefunction_routines = open(pjoin(MG5DIR,'aloha','template_files','wavefunctions.py'),'r').read()
+            
+            _wf = wavefunction_routines.replace("= +", "= ")
+            _wf = _wf.replace("from math import sqrt, pow\n","from monkey_patch import sqrt, pow, complex, max, min\n")
+            _wf = _wf.replace("= -1*complex","= -1.0*complex")
+            _wf = _wf.replace("complex(-","complex(-1.0*")
+            
+            open(pjoin(self.dir_path,'wavefunctions.py'),'w').write(_wf)
         
         ###open(pjoin(self.dir_path,'wavefunctions.py'),'w').write(
         ###    'from __future__ import division\n'+wavefunction_routines)
@@ -355,7 +360,10 @@ class UFOModelConverterPython(export_cpp.UFOModelConverterCPP):
                     if line not in python_imports:
                         python_imports.append(line)
                 else:
-                    new_aloha_routine.append(line.replace("= +","= ").replace("-complex","-1.0*complex").replace("if (M3)","if (M3>0 or M3<0)"))
+                    _line = line.replace("= +","= ")
+                    _line = _line.replace("-complex","-1.0*complex")
+                    _line = _line.replace("if (M3): OM3=1.0/M3**2","OM3 = where(M3 != 0. , 1.0/M3**2, 0. )")
+                    new_aloha_routine.append(_line)
             new_aloha_routines.append('\n'.join(new_aloha_routine))
         aloha_routines = new_aloha_routines
        
@@ -368,6 +376,7 @@ class UFOModelConverterPython(export_cpp.UFOModelConverterCPP):
         aloha_output.write('from __future__ import division\n')
         aloha_output.write('import wavefunctions\n')
         aloha_output.write('from monkey_patch import complex\n')
+        aloha_output.write('from jax.numpy import where\n')
         # Write imports
         ###aloha_output.write('\n'.join(python_imports))
         aloha_output.write('\n'*2)

@@ -23,7 +23,7 @@ class Colour:
 
 module_name = os.path.basename(os.path.dirname(os.path.realpath( __file__ )))
 
-all_process_classes = [{all_process_classes}]
+all_process_classes = [Matrix_1_mupmum_epem]
 
 # For now, the feature of specifying an SLHA param card to initialise
 # the value of independent parameters is not supported yet.
@@ -64,12 +64,14 @@ for process_class in all_process_classes:
     
     print("> PS point:")
     print(PS_point)
-    print("> Matrix element evaluation : %s%.16e%s"%(Colour.GREEN,process.smatrix(PS_point, active_model),Colour.END))
+    #print("> Matrix element evaluation : %s%.16e%s"%(Colour.GREEN,process.smatrix(PS_point, active_model),Colour.END))
     print("")
+    #process.smatrix(PS_point, active_model)
 
-if False:
+if True:
     from processes.all_processes import Matrix_1_mupmum_epem
     from phase_space_generator.flat_phase_space_generator import FlatInvertiblePhasespace, LorentzVectorList, LorentzVector
+
     
     def matrix_element(x,c):
         e = 90.
@@ -94,13 +96,15 @@ if False:
         PS_point = LorentzVectorList(LorentzVector(v) for v in vectors)
         return process.smatrix(PS_point, active_model)[0]
 
-
     matrix_element_prime = jax.grad(matrix_element, 1)
-    
+
+
     print("ME", matrix_element(3.14159, 9.918800e+01))
     print("ME again", matrix_element(3.14159, 8.018800e+01))
-    print("ME derivative:", matrix_element_prime( 3.14159, 9.918800e+01 ))
     
+    print("ME derivative:", matrix_element_prime( 3.14159, 9.918800e+01 ))
+    print("ME derivative again:", matrix_element_prime( 3.14159, 8.018800e+01 ))
+
     
     def first_finite_differences(f, x, c):
         eps = 1e-3
@@ -108,3 +112,53 @@ if False:
                                 for v in jax.numpy.eye(len([c]))])
     
     print( first_finite_differences(matrix_element, 3.14159, 9.918800e+01) )
+
+    
+    def vmap_matrix_element(x_batched, c_batched):
+        return jax.vmap(matrix_element)(x_batched, c_batched)
+    
+    x_batched=jax.np.array([3.14159,3.14159,3.14159])
+    c_batched=jax.np.array([9.918800e+01, 9.918800e+01, 9.918800e+01])
+    print("vmap_matrix_element", vmap_matrix_element(x_batched, c_batched))
+
+
+    matrix_element_jit = jax.jit(matrix_element)
+    matrix_element_prime_jit = jax.jit(jax.grad(matrix_element, 1))
+    vmap_matrix_element_jit = jax.jit(vmap_matrix_element)
+
+    print("Perfoming JIT, first eval triggers compilation")
+    print("matrix_element_jit", matrix_element_jit(3.14159, 9.918800e+01))
+    print("matrix_element_prime_jit", matrix_element_prime_jit(3.14159, 9.918800e+01))
+    print("vmap_matrix_element_jit", vmap_matrix_element_jit(x_batched, c_batched))
+
+
+    from timeit import default_timer as timer
+    
+    start = timer()
+    matrix_element(3.14159, 9.918800e+01)
+    matrix_element(3.14159, 8.018800e+01)
+    end = timer()
+    print("ME time:", end - start)
+
+    start = timer()
+    matrix_element_prime( 3.14159, 9.918800e+01 )
+    matrix_element_prime( 3.14159, 8.018800e+01 )
+    end = timer()
+    print("ME deriv time:", end - start)
+
+    start = timer()
+    matrix_element_jit(3.14159, 9.918800e+01)
+    matrix_element_jit(3.14159, 8.018800e+01)
+    end = timer()
+    print("ME jit time:", end - start)
+
+    start = timer()
+    matrix_element_prime_jit(3.14159, 9.918800e+01)
+    matrix_element_prime_jit(3.14159, 8.018800e+01)
+    end = timer()
+    print("ME deriv jit time:", end - start)
+
+
+    
+
+    

@@ -98,6 +98,9 @@ class What(object):
     def __len__(self):
         return len(self.vector)
 
+    def asarray(self):
+        return self.vector
+    
 
     def square(self):
 
@@ -338,6 +341,11 @@ class LorentzVectorList(list):
         """Return list copy of self."""
 
         return LorentzVectorList(self)
+
+    def to_array(self):
+        """Return a copy as an immutable list of arrays"""
+        
+        return list([v.asarray() for v in self])
 
     def to_tuple(self):
         """Return a copy of this LorentzVectorList as an immutable tuple."""
