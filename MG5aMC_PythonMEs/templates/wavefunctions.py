@@ -37,7 +37,7 @@ def WaveFunction(spin= None, size=None):
     return [0]*size
         
 
-
+@jit
 def ixxxxx(p,fmass,nhel,nsf):
     """Defines an inflow fermion."""
     
@@ -150,7 +150,7 @@ def ixxxxx(p,fmass,nhel,nsf):
     #print("fi=", fi)
     return fi
     
-    
+@jit  
 def oxxxxx(p,fmass,nhel,nsf):
     """ initialize an outgoing fermion"""
     
@@ -255,6 +255,7 @@ def oxxxxx(p,fmass,nhel,nsf):
     return fo
 
 
+@jit
 def vxxxxx(p,vmass,nhel,nsv):
     """ initialize a vector wavefunction. nhel=4 is for checking BRST"""
     
@@ -269,56 +270,172 @@ def vxxxxx(p,vmass,nhel,nsv):
     vc[0] = complex(p[0]*nsv,p[3]*nsv)
     vc[1] = complex(p[1]*nsv,p[2]*nsv)
 
-    if (nhel == 4):
-        if (vmass == 0.):
-            vc[2] = 1.
-            vc[3]=p[1]/p[0]
-            vc[4]=p[2]/p[0]
-            vc[5]=p[3]/p[0]
-        else:
-            vc[2] = p[0]/vmass
-            vc[3] = p[1]/vmass
-            vc[4] = p[2]/vmass
-            vc[5] = p[3]/vmass
-        
-        return vc 
+    #if False:
+    def nhel_4_vmass_zero(p):
+        vc2 = 1
+        vc3 = p[1]/p[0]
+        vc4 = p[2]/p[0]
+        vc5 = p[2]/p[0]
+        return np.array([vc2, vc3, vc4, vc5])
 
-    if (vmass != 0.):
-        hel0 = 1.-abs(nhel) 
+    def nhel_4_vmass_nonzero(p, vmass):
+        vc2 = p[0]/vmass
+        vc3 = p[1]/vmass
+        vc4 = p[2]/vmass
+        vc5 = p[3]/vmass
+        return np.array([vc2, vc3, vc4, vc5])
 
-        if (pp == 0.):
-            vc[2] = complex(0.,0.)
-            vc[3] = complex(-1.0*nhel*sqh,0.)
-            vc[4] = complex(0.,nsvahl*sqh) 
-            vc[5] = complex(hel0,0.)
+    def nhel_4(p, vmass):
+        vc2345 = np.where(vmass==0. , nhel_4_vmass_zero(p), nhel_4_vmass_nonzero(p, vmass))
+        return vc2345
 
-        else:
-            emp = p[0]/(vmass*pp)
-            vc[2] = complex(hel0*pp/vmass,0.)
-            vc[5] = complex(hel0*p[3]*emp+nhel*pt/pp*sqh)
-            if (pt != 0.):
-                pzpt = p[3]/(pp*pt)*sqh*nhel
-                vc[3] = complex(hel0*p[1]*emp-p[1]*pzpt, \
-                    -nsvahl*p[2]/pt*sqh)
-                vc[4] = complex(hel0*p[2]*emp-p[2]*pzpt, \
-                    nsvahl*p[1]/pt*sqh) 
-            else:
-                vc[3] = complex(-1.0*nhel*sqh,0.)
-                vc[4] = complex(0.,nsvahl*sign(sqh,p[3]))
-    else: 
+    def nhel_not4_vmass_nonzero_pp_zero(p,vmass,nhel,nsv, sqh, nsvahl, pp, pt, hel0):
+        vc2 = complex(0.,0.)
+        vc3 = complex(-1.0*nhel*sqh,0.)
+        vc4 = complex(0.,nsvahl*sqh) 
+        vc5 = complex(hel0,0.)
+        return np.array([vc2, vc3, vc4, vc5])
+
+    def nhel_not4_vmass_nonzero_pp_nonzero_pt_nonzero(p,vmass,nhel,nsv, sqh, nsvahl, pp, pt, hel0, emp):
+        vc2 = complex(hel0*pp/vmass,0.)
+        vc5 = complex(hel0*p[3]*emp+nhel*pt/pp*sqh,0.)
+
+        pzpt = p[3]/(pp*pt)*sqh*nhel
+        vc3 = complex(hel0*p[1]*emp-p[1]*pzpt, -nsvahl*p[2]/pt*sqh)
+        vc4 = complex(hel0*p[2]*emp-p[2]*pzpt, nsvahl*p[1]/pt*sqh)
+
+        return np.array([vc2, vc3, vc4, vc5])
+
+    def nhel_not4_vmass_nonzero_pp_nonzero_pt_zero(p,vmass,nhel,nsv, sqh, nsvahl, pp, pt, hel0, emp):
+        vc2 = complex(hel0*pp/vmass,0.)
+        vc5 = complex(hel0*p[3]*emp+nhel*pt/pp*sqh,0.)
+
+        vc3 = complex(-1.0*nhel*sqh,0.)
+        vc4 = complex(0.,nsvahl*sign(sqh,p[3]))
+
+        return np.array([vc2, vc3, vc4, vc5])
+
+    def nhel_not4_vmass_nonzero_pp_nonzero(p,vmass,nhel,nsv, sqh, nsvahl, pp, pt, hel0):
+        emp = p[0]/(vmass*pp)
+
+        vc2345 = np.where(pt != 0. ,
+                              nhel_not4_vmass_nonzero_pp_nonzero_pt_nonzero(p,vmass,nhel,nsv, sqh, nsvahl, pp, pt, hel0, emp),
+                              nhel_not4_vmass_nonzero_pp_nonzero_pt_zero(p,vmass,nhel,nsv, sqh, nsvahl, pp, pt, hel0, emp) )
+
+        return vc2345
+
+    def nhel_not4_vmass_nonzero(p,vmass,nhel,nsv, sqh, nsvahl, pp, pt):
+        hel0 = 1.-abs(nhel)
+
+        vc2345 = np.where( pp == 0. ,
+                               nhel_not4_vmass_nonzero_pp_zero(p,vmass,nhel,nsv, sqh, nsvahl, pp, pt, hel0),
+                               nhel_not4_vmass_nonzero_pp_nonzero(p,vmass,nhel,nsv, sqh, nsvahl, pp, pt, hel0) )
+
+        return vc2345
+
+    def nhel_not4_vmass_zero_pt_nonzero(p,vmass,nhel,nsv, sqh, nsvahl, pp, pt):
+        vc2 = complex(0.,0.)
+        vc5 = complex(nhel*pt/pp*sqh,0.)
+
+        pzpt = p[3]/(pp*pt)*sqh*nhel
+        vc3 = complex(-1.0*p[1]*pzpt,-nsv*p[2]/pt*sqh)
+        vc4 = complex(-1.0*p[2]*pzpt,nsv*p[1]/pt*sqh)
+
+        return np.array([vc2, vc3, vc4, vc5])
+
+    def nhel_not4_vmass_zero_pt_zero(p,vmass,nhel,nsv, sqh, nsvahl, pp, pt):
+        vc2 = complex(0.,0.)
+        vc5 = complex(nhel*pt/pp*sqh,0.)
+
+        vc3 = complex(-1.0*nhel*sqh,0.)
+        vc4 = complex(0.,nsv*sign(sqh,p[3]))
+
+        return np.array([vc2, vc3, vc4, vc5])
+
+    def nhel_not4_vmass_zero(p,vmass,nhel,nsv, sqh, nsvahl, pp, pt):
         pp = p[0]
         pt = sqrt(p[1]**2 + p[2]**2)
-        vc[2] = complex(0.,0.)
-        vc[5] = complex(nhel*pt/pp*sqh)
-        if (pt != 0.):
-            pzpt = p[3]/(pp*pt)*sqh*nhel
-            vc[3] = complex(-1.0*p[1]*pzpt,-nsv*p[2]/pt*sqh)
-            vc[4] = complex(-1.0*p[2]*pzpt,nsv*p[1]/pt*sqh)
-        else:
-            vc[3] = complex(-1.0*nhel*sqh,0.)
-            vc[4] = complex(0.,nsv*sign(sqh,p[3]))
-    
+
+        vc2345 = np.where( pt != 0. ,
+                               nhel_not4_vmass_zero_pt_nonzero(p,vmass,nhel,nsv, sqh, nsvahl, pp, pt),
+                               nhel_not4_vmass_zero_pt_zero(p,vmass,nhel,nsv, sqh, nsvahl, pp, pt) )
+
+        return vc2345
+
+
+    def nhel_not4(p,vmass,nhel,nsv, sqh, nsvahl, pp, pt):
+        vc2345 = np.where( vmass != 0. ,
+                               nhel_not4_vmass_nonzero(p,vmass,nhel,nsv, sqh, nsvahl, pp, pt),
+                               nhel_not4_vmass_zero(p,vmass,nhel,nsv, sqh, nsvahl, pp, pt) )
+
+        return vc2345
+
+        
+    vc2345 = np.where( nhel == 4,
+                           nhel_4(p, vmass),
+                           nhel_not4(p,vmass,nhel,nsv, sqh, nsvahl, pp, pt) )
+
+
+    vc[2]=vc2345[0]
+    vc[3]=vc2345[1]
+    vc[4]=vc2345[1]
+    vc[5]=vc2345[3]
+
+    #print("vc=", vc)
     return vc
+    
+    # else:
+
+    #     if (nhel == 4):
+    #         if (vmass == 0.):
+    #             vc[2] = 1.
+    #             vc[3]=p[1]/p[0]
+    #             vc[4]=p[2]/p[0]
+    #             vc[5]=p[3]/p[0]
+    #         else:
+    #             vc[2] = p[0]/vmass
+    #             vc[3] = p[1]/vmass
+    #             vc[4] = p[2]/vmass
+    #             vc[5] = p[3]/vmass
+
+    #         return vc 
+
+    #     if (vmass != 0.):
+    #         hel0 = 1.-abs(nhel) 
+            
+    #         if (pp == 0.):
+    #             vc[2] = complex(0.,0.)
+    #             vc[3] = complex(-1.0*nhel*sqh,0.)
+    #             vc[4] = complex(0.,nsvahl*sqh,0.) 
+    #             vc[5] = complex(hel0,0.)
+                
+    #         else:
+    #             emp = p[0]/(vmass*pp)
+    #             vc[2] = complex(hel0*pp/vmass,0.)
+    #             vc[5] = complex(hel0*p[3]*emp+nhel*pt/pp*sqh,0.)
+    #             if (pt != 0.):
+    #                 pzpt = p[3]/(pp*pt)*sqh*nhel
+    #                 vc[3] = complex(hel0*p[1]*emp-p[1]*pzpt, \
+    #                     -nsvahl*p[2]/pt*sqh)
+    #                 vc[4] = complex(hel0*p[2]*emp-p[2]*pzpt, \
+    #                     nsvahl*p[1]/pt*sqh) 
+    #             else:
+    #                 vc[3] = complex(-1.0*nhel*sqh,0.)
+    #                 vc[4] = complex(0.,nsvahl*sign(sqh,p[3]))
+    #     else: 
+    #         pp = p[0]
+    #         pt = sqrt(p[1]**2 + p[2]**2)
+    #         vc[2] = complex(0.,0.)
+    #         vc[5] = complex(nhel*pt/pp*sqh,0.)
+    #         if (pt != 0.):
+    #             pzpt = p[3]/(pp*pt)*sqh*nhel
+    #             vc[3] = complex(-1.0*p[1]*pzpt,-nsv*p[2]/pt*sqh)
+    #             vc[4] = complex(-1.0*p[2]*pzpt,nsv*p[1]/pt*sqh)
+    #         else:
+    #             vc[3] = complex(-1.0*nhel*sqh,0.)
+    #             vc[4] = complex(0.,nsv*sign(sqh,p[3]))
+
+    #     return vc
 
 def sign(x,y):
     _sign = np.where(type(y) == np.complex64, np.sign(y.real), np.sign(y))
