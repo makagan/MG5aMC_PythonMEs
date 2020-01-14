@@ -528,8 +528,12 @@ class PythonMEExporter(export_python.ProcessExporterPython):
     def get_external_masses(self, matrix_element):
         """ Return a tuple of the form (initial_masses, final_masses)."""
 
+        # ---------------------------
+        # Changed to legs with decays
+        # ---------------------------
+        # proc_legs = matrix_element.get('processes')[0].get('legs')
         
-        proc_legs = matrix_element.get('processes')[0].get('legs')
+        proc_legs =matrix_element.get('processes')[0].get('legs_with_decays')
 
         initial_masses = []
         final_masses = []
