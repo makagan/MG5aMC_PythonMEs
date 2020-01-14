@@ -41,6 +41,8 @@ class ModelParameters(object):
         
         self.ZERO = 0.
 
+        self.params = {}
+
         # Computing independent parameters
 %(set_independent_parameters)s
 
@@ -53,6 +55,8 @@ class ModelParameters(object):
         # Computing independent parameters
 %(set_dependent_couplings)s
 
+
+
         # Setting independent parameters
 %(independent_parameters)s
 
@@ -64,6 +68,23 @@ class ModelParameters(object):
 
         # Setting independent parameters
 %(dependent_couplings)s
+
+
+
+        # ------------------------------
+        # Building Dictionary
+        # ------------------------------
+        # Setting independent parameters
+%(independent_parameters_dict)s
+
+        # Setting independent couplings
+%(independent_couplings_dict)s
+
+        # Setting dependent parameters
+%(dependent_parameters_dict)s
+
+        # Setting independent parameters
+%(dependent_couplings_dict)s
 
     def __str__(self):
         """ Print all parameters contained in this model."""

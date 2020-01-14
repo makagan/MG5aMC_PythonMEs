@@ -43,12 +43,24 @@ class Matrix_%(process_string)s(object):
         self.amp2 = [0.] * ndiags
         self.helEvals = []
         ans = 0.
-        for hel in helicities:
-            t = self.matrix(p, hel, model)
-            ans = ans + t
-            self.helEvals.append([hel, t.real / denominator ])
+
+        # ----------
+        # OLD CODE
+        # ----------
+        #for hel in helicities:
+        #    t = self.matrix(p, hel, model)
+        #    ans = ans + t
+        #    self.helEvals.append([hel, t.real / denominator ])
+
+        t = self.vmap_matrix( p, np.array(helicities), model )
+        ans = np.sum(t)
+        self.helEvals.append( (helicities, t.real / denominator) )
+        
         ans = ans / denominator
         return ans.real
+    
+    def vmap_matrix(self, p, hel_batch, model):
+        return vmap(self.matrix, in_axes=(None,0,None), out_axes=0)(p, hel_batch, model)
 
     def matrix(self, p, hel, model):
         #  
@@ -87,12 +99,18 @@ class Matrix_%(process_string)s(object):
         %(jamp_lines)s
 
         %(amp2_lines)s
-        matrix = 0.
-        for i in range(ncolor):
-            ztemp = 0
-            for j in range(ncolor):
-                ztemp = ztemp + cf[i][j]*jamp[j]
-            matrix = matrix + ztemp * jamp[i].conjugate()/denom[i]   
+
+        # ----------
+        # OLD CODE
+        # ----------
+        #matrix = 0.
+        #for i in range(ncolor):
+        #    ztemp = 0
+        #    for j in range(ncolor):
+        #        ztemp = ztemp + cf[i][j]*jamp[j]
+        #    matrix = matrix + ztemp * jamp[i].conjugate()/denom[i]   
         self.jamp.append(jamp)
+
+        matrix = np.sum( np.dot(np.array(cf), np.array(jamp)) * np.array(jamp).conjugate() / np.array(denom) )
 
         return matrix

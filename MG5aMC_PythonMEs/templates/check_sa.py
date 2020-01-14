@@ -2,10 +2,11 @@
 
 import random
 import os
+from timeit import default_timer as timer
 
 from processes.all_processes import *
 from model.parameters import ModelParameters, ParamCard
-from phase_space_generator.flat_phase_space_generator import FlatInvertiblePhasespace 
+from phase_space_generator.flat_phase_space_generator import FlatInvertiblePhasespace
 
 import jax
 
@@ -23,7 +24,7 @@ class Colour:
 
 module_name = os.path.basename(os.path.dirname(os.path.realpath( __file__ )))
 
-all_process_classes = [Matrix_1_mupmum_epem]
+all_process_classes = [{all_process_classes}]
 
 # For now, the feature of specifying an SLHA param card to initialise
 # the value of independent parameters is not supported yet.
@@ -65,98 +66,158 @@ for process_class in all_process_classes:
     print("> PS point:")
     print(PS_point)
     #print("> Matrix element evaluation : %s%.16e%s"%(Colour.GREEN,process.smatrix(PS_point, active_model),Colour.END))
+    print("> Matrix element evaluation :", process.smatrix(PS_point.to_array(), active_model.params) )
     print("")
     #process.smatrix(PS_point, active_model)
 
-if True:
-    from processes.all_processes import Matrix_1_mupmum_epem
-    from phase_space_generator.flat_phase_space_generator import FlatInvertiblePhasespace, LorentzVectorList, LorentzVector
-
-    
-    def matrix_element(x,c):
-        e = 90.
-        theta = x
-        Z_mass = c
+    def matrix_element(c,PS_point):
+        _Z_mass = c
         
-        pc = ParamCard()
-        pc.set_block_entry("mass", 23, Z_mass) #9.118800e+01
-        active_model = ModelParameters(pc)
-    
-    
-        process = Matrix_1_mupmum_epem()      
-    
-    
-        vectors = [
-            [e/2,0,0, e/2],
-            [e/2,0,0,-e/2],
-            [e/2.5, 0, e/2.5*jax.numpy.sin(theta), e/2*jax.numpy.cos(theta)],
-            [e/2.5, 0,-e/2.5*jax.numpy.sin(theta),-e/2*jax.numpy.cos(theta)],
-        ]
-            
-        PS_point = LorentzVectorList(LorentzVector(v) for v in vectors)
-        return process.smatrix(PS_point, active_model)[0]
-
-    matrix_element_prime = jax.grad(matrix_element, 1)
-
-
-    print("ME", matrix_element(3.14159, 9.918800e+01))
-    print("ME again", matrix_element(3.14159, 8.018800e+01))
-    
-    print("ME derivative:", matrix_element_prime( 3.14159, 9.918800e+01 ))
-    print("ME derivative again:", matrix_element_prime( 3.14159, 8.018800e+01 ))
-
-    
-    def first_finite_differences(f, x, c):
-        eps = 1e-3
-        return jax.numpy.array([(f(x, c + eps * v) - f(x, c - eps * v)) / (2 * eps)
-                                for v in jax.numpy.eye(len([c]))])
-    
-    print( first_finite_differences(matrix_element, 3.14159, 9.918800e+01) )
-
-    
-    def vmap_matrix_element(x_batched, c_batched):
-        return jax.vmap(matrix_element)(x_batched, c_batched)
-    
-    x_batched=jax.np.array([3.14159,3.14159,3.14159])
-    c_batched=jax.np.array([9.918800e+01, 9.918800e+01, 9.918800e+01])
-    print("vmap_matrix_element", vmap_matrix_element(x_batched, c_batched))
-
+        _pc = ParamCard()
+        _pc.set_block_entry("mass", 23, _Z_mass) #9.118800e+01
+        _active_model_params = ModelParameters(_pc).params
+        
+        _process = process_class()      
+        return process.smatrix(PS_point, _active_model_params)
 
     matrix_element_jit = jax.jit(matrix_element)
-    matrix_element_prime_jit = jax.jit(jax.grad(matrix_element, 1))
-    vmap_matrix_element_jit = jax.jit(vmap_matrix_element)
+    matrix_element_prime = jax.grad(matrix_element, 0)
+    matrix_element_prime_jit = jax.jit(matrix_element_prime )
 
-    print("Perfoming JIT, first eval triggers compilation")
-    print("matrix_element_jit", matrix_element_jit(3.14159, 9.918800e+01))
-    print("matrix_element_prime_jit", matrix_element_prime_jit(3.14159, 9.918800e+01))
-    print("vmap_matrix_element_jit", vmap_matrix_element_jit(x_batched, c_batched))
-
-
-    from timeit import default_timer as timer
+    print("ME:", matrix_element(9.918800e+01, PS_point.to_array()))
+    start = timer()
+    print("ME jit:", matrix_element_jit(9.918800e+01, PS_point.to_array()))
+    end = timer()
+    print("ME jit compilation + eval time:", (end - start))
     
+    print("ME prime:", matrix_element_prime(9.918800e+01, PS_point.to_array()))
     start = timer()
-    matrix_element(3.14159, 9.918800e+01)
-    matrix_element(3.14159, 8.018800e+01)
+    print("ME prime jit:", matrix_element_prime_jit(9.918800e+01, PS_point.to_array()))
     end = timer()
-    print("ME time:", end - start)
+    print("ME primt jit compilation + eval time:", (end - start))
+
+    # -----------------
+    # Timing Test
+    # -----------------
+    start = timer()
+    matrix_element(9.818800e+01, PS_point.to_array())
+    matrix_element(9.718800e+01, PS_point.to_array())
+    end = timer()
+    print("ME ave time:", (end - start)/2.0 )
 
     start = timer()
-    matrix_element_prime( 3.14159, 9.918800e+01 )
-    matrix_element_prime( 3.14159, 8.018800e+01 )
+    matrix_element_jit(9.818800e+01, PS_point.to_array())
+    matrix_element_jit(9.718800e+01, PS_point.to_array())
     end = timer()
-    print("ME deriv time:", end - start)
+    print("ME jit ave time:", (end - start)/2.0 )
 
     start = timer()
-    matrix_element_jit(3.14159, 9.918800e+01)
-    matrix_element_jit(3.14159, 8.018800e+01)
+    matrix_element_prime(9.818800e+01, PS_point.to_array())
+    matrix_element_prime(9.718800e+01, PS_point.to_array())
     end = timer()
-    print("ME jit time:", end - start)
+    print("ME prime ave time:", (end - start)/2.0 )
 
     start = timer()
-    matrix_element_prime_jit(3.14159, 9.918800e+01)
-    matrix_element_prime_jit(3.14159, 8.018800e+01)
+    matrix_element_prime_jit(9.818800e+01, PS_point.to_array())
+    matrix_element_prime_jit(9.718800e+01, PS_point.to_array())
     end = timer()
-    print("ME deriv jit time:", end - start)
+    print("ME prime ave time:", (end - start)/2.0 )
+
+    
+    # -----------------
+    # Only eval one ME
+    # -----------------
+    break
+
+# if True:
+#     from processes.all_processes import Matrix_1_mupmum_epem
+#     from phase_space_generator.flat_phase_space_generator import FlatInvertiblePhasespace, LorentzVectorList, LorentzVector
+
+    
+#     def matrix_element(x,c):
+#         e = 90.
+#         theta = x
+#         Z_mass = c
+        
+#         pc = ParamCard()
+#         pc.set_block_entry("mass", 23, Z_mass) #9.118800e+01
+#         active_model = ModelParameters(pc)
+    
+    
+#         process = Matrix_1_mupmum_epem()      
+    
+    
+#         vectors = [
+#             [e/2,0,0, e/2],
+#             [e/2,0,0,-e/2],
+#             [e/2.5, 0, e/2.5*jax.numpy.sin(theta), e/2*jax.numpy.cos(theta)],
+#             [e/2.5, 0,-e/2.5*jax.numpy.sin(theta),-e/2*jax.numpy.cos(theta)],
+#         ]
+            
+#         PS_point = LorentzVectorList(LorentzVector(v) for v in vectors)
+#         return process.smatrix(PS_point, active_model)[0]
+
+#     matrix_element_prime = jax.grad(matrix_element, 1)
+
+
+#     print("ME", matrix_element(3.14159, 9.918800e+01))
+#     print("ME again", matrix_element(3.14159, 8.018800e+01))
+    
+#     print("ME derivative:", matrix_element_prime( 3.14159, 9.918800e+01 ))
+#     print("ME derivative again:", matrix_element_prime( 3.14159, 8.018800e+01 ))
+
+    
+#     def first_finite_differences(f, x, c):
+#         eps = 1e-3
+#         return jax.numpy.array([(f(x, c + eps * v) - f(x, c - eps * v)) / (2 * eps)
+#                                 for v in jax.numpy.eye(len([c]))])
+    
+#     print( first_finite_differences(matrix_element, 3.14159, 9.918800e+01) )
+
+    
+#     def vmap_matrix_element(x_batched, c_batched):
+#         return jax.vmap(matrix_element)(x_batched, c_batched)
+    
+#     x_batched=jax.np.array([3.14159,3.14159,3.14159])
+#     c_batched=jax.np.array([9.918800e+01, 9.918800e+01, 9.918800e+01])
+#     print("vmap_matrix_element", vmap_matrix_element(x_batched, c_batched))
+
+
+#     matrix_element_jit = jax.jit(matrix_element)
+#     matrix_element_prime_jit = jax.jit(jax.grad(matrix_element, 1))
+#     vmap_matrix_element_jit = jax.jit(vmap_matrix_element)
+
+#     print("Perfoming JIT, first eval triggers compilation")
+#     print("matrix_element_jit", matrix_element_jit(3.14159, 9.918800e+01))
+#     print("matrix_element_prime_jit", matrix_element_prime_jit(3.14159, 9.918800e+01))
+#     print("vmap_matrix_element_jit", vmap_matrix_element_jit(x_batched, c_batched))
+
+
+#     from timeit import default_timer as timer
+    
+#     start = timer()
+#     matrix_element(3.14159, 9.918800e+01)
+#     matrix_element(3.14159, 8.018800e+01)
+#     end = timer()
+#     print("ME time:", end - start)
+
+#     start = timer()
+#     matrix_element_prime( 3.14159, 9.918800e+01 )
+#     matrix_element_prime( 3.14159, 8.018800e+01 )
+#     end = timer()
+#     print("ME deriv time:", end - start)
+
+#     start = timer()
+#     matrix_element_jit(3.14159, 9.918800e+01)
+#     matrix_element_jit(3.14159, 8.018800e+01)
+#     end = timer()
+#     print("ME jit time:", end - start)
+
+#     start = timer()
+#     matrix_element_prime_jit(3.14159, 9.918800e+01)
+#     matrix_element_prime_jit(3.14159, 8.018800e+01)
+#     end = timer()
+#     print("ME deriv jit time:", end - start)
 
 
     

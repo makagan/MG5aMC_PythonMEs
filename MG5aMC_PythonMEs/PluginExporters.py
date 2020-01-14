@@ -232,6 +232,21 @@ class UFOModelConverterPython(export_cpp.UFOModelConverterCPP):
                                    "%s# Model couplings dependent on aS\n"%(' '*indent) + \
                                    self.write_parameters(self.coups_dep.values())
 
+                                   
+        replace_dict['independent_parameters_dict'] = \
+                                   "%s# Model parameters independent of aS\n"%(' '*indent) + \
+                                   self.write_parameters_dict(self.params_indep)
+        replace_dict['independent_couplings_dict'] = \
+                                   "%s# Model parameters dependent on aS\n"%(' '*indent) + \
+                                   self.write_parameters_dict(self.params_dep)
+        replace_dict['dependent_parameters_dict'] = \
+                                   "%s# Model couplings independent of aS\n"%(' '*indent) + \
+                                   self.write_parameters_dict(self.coups_indep)
+        replace_dict['dependent_couplings_dict'] = \
+                                   "%s# Model couplings dependent on aS\n"%(' '*indent) + \
+                                   self.write_parameters_dict(self.coups_dep.values())
+
+                                   
         replace_dict['set_independent_parameters'] = \
                                self.write_set_parameters(self.params_indep)
         replace_dict['set_independent_couplings'] = \
@@ -241,6 +256,7 @@ class UFOModelConverterPython(export_cpp.UFOModelConverterCPP):
         replace_dict['set_dependent_couplings'] = \
                                self.write_set_parameters(self.coups_dep.values())
 
+                               
         replace_dict['print_independent_parameters'] = \
                                self.write_print_parameters(self.params_indep)
         replace_dict['print_independent_couplings'] = \
@@ -269,6 +285,22 @@ class UFOModelConverterPython(export_cpp.UFOModelConverterCPP):
                 res_strings.append('%sself.%s = %s(%s)'%(' '*indent, param.name, self.type_dict[param.type], param.name))
 
         return '\n'.join(res_strings)
+
+    
+    def write_parameters_dict(self, params, indent=8):
+        """Write out the definitions of parameters"""
+
+        # For each parameter type, write out the definition forcing a cast into the right type
+        res_strings = []
+        for param in params:
+            # Not needed in Python, but kept for potential future use
+            if param.type == 'real':
+                res_strings.append('%sself.params["%s"] = %s(%s.real)'%(' '*indent, param.name, '', param.name))      
+            else:
+                res_strings.append('%sself.params["%s"] = %s(%s)'%(' '*indent, param.name, self.type_dict[param.type], param.name))
+
+        return '\n'.join(res_strings)
+
 
     def write_set_parameters(self, params, indent=8):
         """Write out the lines of independent parameters"""
@@ -542,12 +574,20 @@ class PythonMEExporter(export_python.ProcessExporterPython):
                               matrix_element.get_all_amplitudes() for c in func.get('coupling')
                               if func.get('mothers') ]))
         
+        # return "\n        ".join([\
+        #                  "%(param)s = model.%(param)s"\
+        #                  % {"param": param} for param in parameters]) + \
+        #        "\n        " + "\n        ".join([\
+        #                  "%(coup)s = model.%(coup)s"\
+        #                       % {"coup": coup} for coup in couplings])
+
         return "\n        ".join([\
-                         "%(param)s = model.%(param)s"\
+                         '%(param)s = model["%(param)s"]'\
                          % {"param": param} for param in parameters]) + \
                "\n        " + "\n        ".join([\
-                         "%(coup)s = model.%(coup)s"\
+                         '%(coup)s = model["%(coup)s"]'\
                               % {"coup": coup} for coup in couplings])
+                              
 
 class PluginProcessExporterPython(object):
    
@@ -588,7 +628,9 @@ sys.path.insert(0, root_path)
         # First add common imports
         all_processes.write('from __future__ import division\n')
         all_processes.write('from model.aloha_methods import *\n')
-        all_processes.write('from model.wavefunctions import *\n')        
+        all_processes.write('from model.wavefunctions import *\n')
+        all_processes.write('from jax import vmap \n')
+        all_processes.write('from jax import numpy as np \n')
         all_processes.close()
 
         self.helas_call_writers = helas_call_writers
@@ -615,8 +657,15 @@ sys.path.insert(0, root_path)
 
             cf = val[val.find("cf =") : val.find(";", val.find("cf ="))]
             new_cf = cf[0:cf.find("]")] + "." + cf[cf.find("]"):]
+
+            val = val.replace("= +","= ")
+            val = val.replace("(+amp","(+1.0*amp")
+            val = val.replace("(-amp","(-1.0*amp")
+            val = val.replace(denom, new_denom)
+            val = val.replace(cf, new_cf)
             
-            all_processes.write(val.replace("= +","= ").replace(denom, new_denom).replace(cf, new_cf))
+            #all_processes.write(val.replace("= +","= ").replace(denom, new_denom).replace(cf, new_cf))
+            all_processes.write(val)
             all_processes.write('\n')
             
         ###all_processes.write('\n'.join(matrix_methods.values()))

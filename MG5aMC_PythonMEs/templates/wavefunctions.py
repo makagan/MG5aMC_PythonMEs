@@ -4,7 +4,7 @@ from monkey_patch import sqrt, pow, complex, max, min
 from itertools import product
 
 import jax.numpy as np
-from jax import jit
+#from jax import jit
 
 #class WaveFunction(list):
 #    """a objet for a WaveFunction"""
@@ -37,7 +37,7 @@ def WaveFunction(spin= None, size=None):
     return [0]*size
         
 
-@jit
+
 def ixxxxx(p,fmass,nhel,nsf):
     """Defines an inflow fermion."""
     
@@ -150,7 +150,7 @@ def ixxxxx(p,fmass,nhel,nsf):
     #print("fi=", fi)
     return fi
     
-@jit  
+  
 def oxxxxx(p,fmass,nhel,nsf):
     """ initialize an outgoing fermion"""
     
@@ -255,7 +255,7 @@ def oxxxxx(p,fmass,nhel,nsf):
     return fo
 
 
-@jit
+
 def vxxxxx(p,vmass,nhel,nsv):
     """ initialize a vector wavefunction. nhel=4 is for checking BRST"""
     
