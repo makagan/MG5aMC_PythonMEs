@@ -144,7 +144,7 @@ def ixxxxx(p,fmass,nhel,nsf):
     
     fi[2]=fi2345[0]
     fi[3]=fi2345[1]
-    fi[4]=fi2345[1]
+    fi[4]=fi2345[2]
     fi[5]=fi2345[3]
 
     #print("fi=", fi)
@@ -248,7 +248,7 @@ def oxxxxx(p,fmass,nhel,nsf):
     
     fo[2]=fo2345[0]
     fo[3]=fo2345[1]
-    fo[4]=fo2345[1]
+    fo[4]=fo2345[2]
     fo[5]=fo2345[3]
 
     #print("fo=", fo)
@@ -378,7 +378,7 @@ def vxxxxx(p,vmass,nhel,nsv):
 
     vc[2]=vc2345[0]
     vc[3]=vc2345[1]
-    vc[4]=vc2345[1]
+    vc[4]=vc2345[2]
     vc[5]=vc2345[3]
 
     #print("vc=", vc)

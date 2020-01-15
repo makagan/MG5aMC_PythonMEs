@@ -62,16 +62,16 @@ class What3(object):
         return self.vector.dot(self.vector)
 
     def __div__(self, scalar):
-        return What( self.vector/scalar)
+        return What3( self.vector/scalar)
 
     def __rmul__(self, scalar):
         return self * scalar
 
     def __mul__(self, scalar):
-        return What( self.vector*scalar)
+        return What3( self.vector*scalar)
 
     def __mull__(self, scalar):
-        return What( self.vector*scalar)
+        return What3( self.vector*scalar)
 
 class What(object):
     def __init__(self,vec):
@@ -104,7 +104,7 @@ class What(object):
 
     def square(self):
 
-        return self.vector.dot(self.vector)
+        return self.dot(self.vector)
 
     def set_square(self, square, negative=False):
         """Change the time component of this LorentzVector
@@ -173,7 +173,8 @@ class What(object):
         bp = self.space().vector.dot(boost_vector.vector)
         gamma2 = (gamma-1.0) / b2 if b2 > 0 else 0.
         factor = gamma2*bp + gamma*self[0]
-        self.space().vector += factor*boost_vector.vector
+        #self.space().vector += factor*boost_vector.vector
+        self[1:] += factor*boost_vector.vector
         self[0] = gamma*(self[0] + bp)
         return self
 

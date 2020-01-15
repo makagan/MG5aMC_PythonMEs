@@ -9,6 +9,8 @@ from model.parameters import ModelParameters, ParamCard
 from phase_space_generator.flat_phase_space_generator import FlatInvertiblePhasespace
 
 import jax
+from jax.config import config
+config.update('jax_enable_x64', True)
 
 class Colour:
    PURPLE = '\033[95m'
