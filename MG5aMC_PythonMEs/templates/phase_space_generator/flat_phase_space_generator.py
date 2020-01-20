@@ -1,6 +1,7 @@
 import sys
 import os
 
+import jax
 import logging
 import math
 from phase_space_generator.vectors import Vector, LorentzVector
@@ -243,35 +244,35 @@ class FlatInvertiblePhasespace(VirtualPhaseSpaceGenerator):
             # don't have access to that here, so we just return 1.
             return 1.
 
-        return math.pow((math.pi/2.0),n-1)*\
-            (math.pow((E_cm**2),n-2)/(math.factorial(n-1)*math.factorial(n-2)))
+        return jax.numpy.power((math.pi/2.0),n-1)*\
+            (jax.numpy.power((E_cm**2),n-2)/(math.factorial(n-1)*math.factorial(n-2)))
 
     @staticmethod
-    def bisect(v, n, target=1.e-16, maxLevel=80):
-        """Solve v = (n+2) * u^(n+1) - (n+1) * u^(n+2) for u."""
-        
-        if (v == 0. or v == 1.): return v
+    def bisect(v,n):
+        def scalar_solve(f, y):
+            return y / f(1.0)
 
-        level = 0
-        left  = 0.
-        right = 1.
-            
-        checkV = -1.
-        u = -1.
+        def binary_search(func, x0, low=0.0, high=1.0, tolerance=1e-6):
+            del x0  # unused
 
-        while (level < maxLevel):
-            u = (left + right) * (0.5**(level + 1))
-            checkV = (u**(n+1)) * (n+2.-(n+1.)*u)
-            error = abs(1. - checkV / v)
-            if (error == 0. or error <= target):
-                break
-            left *= 2.
-            right *= 2.
-            if (v <= checkV ): right -= 1.
-            else: left += 1.
-            level += 1
+            def cond(state):
+                low, high = state
+                return high - low > tolerance
 
-        return u
+            def body(state):
+                low, high = state
+                midpoint = 0.5 * (low + high)
+                update_upper = func(midpoint) > 0
+                low = jax.numpy.where(update_upper, low, midpoint)
+                high = jax.numpy.where(update_upper, midpoint, high)
+                return (low, high)
+
+            solution, _ = jax.lax.while_loop(cond, body, (low, high))
+            return solution
+        tangent_solve=scalar_solve
+        def f(u):
+            return (u**(n+1)) * (n+2.-(n+1.)*u)-v
+        return jax.lax.custom_root(f, 0.5, binary_search, tangent_solve)
     
     @staticmethod
     def rho(M, N, m):
@@ -301,16 +302,16 @@ class FlatInvertiblePhasespace(VirtualPhaseSpaceGenerator):
 
         elif self.n_initial == 2:
             if self.initial_masses[0] == 0. or self.initial_masses[1] == 0.:
-                output_momenta[0] = LorentzVector([E_cm/2.0 , 0., 0., +E_cm/2.0])
-                output_momenta[1] = LorentzVector([E_cm/2.0 , 0., 0., -E_cm/2.0])
+                output_momenta[0] = LorentzVector([E_cm/2.0 , 0., 0., 1.0*E_cm/2.0])
+                output_momenta[1] = LorentzVector([E_cm/2.0 , 0., 0., (-1.0)*E_cm/2.0])
             else:
                 M1sq = self.initial_masses[0]**2
                 M2sq = self.initial_masses[1]**2
                 E1 = (E_cm**2+M1sq-M2sq)/ E_cm
                 E2 = (E_cm**2-M1sq+M2sq)/ E_cm
-                Z = math.sqrt(E_cm**4 - 2*E_cm**2*M1sq - 2*E_cm**2*M2sq + M1sq**2 - 2*M1sq*M2sq + M2sq**2) / E_cm
-                output_momenta[0] = LorentzVector([E1/2.0 , 0., 0., +Z/2.0])
-                output_momenta[1] = LorentzVector([E2/2.0 , 0., 0., -Z/2.0])
+                Z = jax.numpy.sqrt(E_cm**4 - 2*E_cm**2*M1sq - 2*E_cm**2*M2sq + M1sq**2 - 2*M1sq*M2sq + M2sq**2) / E_cm
+                output_momenta[0] = LorentzVector([E1/2.0 , 0., 0., 1.0*Z/2.0])
+                output_momenta[1] = LorentzVector([E2/2.0 , 0., 0., (-1.0)*Z/2.0])
         return
 
     def get_PS_point(self, random_variables):
@@ -323,12 +324,13 @@ class FlatInvertiblePhasespace(VirtualPhaseSpaceGenerator):
             random_variables = self.dimensions.random_sample()
         
         # Check the sensitivity of te inputs from the integrator
-        if any(math.isnan(r) for r in random_variables):
-            logger.warning('Some input variables from the integrator are malformed: %s'%
-                ( ', '.join( '%s=%s'%( name, random_variables[pos]) for name, pos in 
-                                                     self.dim_name_to_position.items() ) ))
-            logger.warning('The PS generator will yield None, triggering the point to be skipped.')
-            return None, 0.0, (0., 0.), (0., 0.)
+        # Lukas: not part of computation ignore for now
+        # if jax.numpy.any(jax.numpy.isnan(random_variables)):
+        #     logger.warning('Some input variables from the integrator are malformed: %s'%
+        #         ( ', '.join( '%s=%s'%( name, random_variables[pos]) for name, pos in 
+        #                                              self.dim_name_to_position.items() ) ))
+        #     logger.warning('The PS generator will yield None, triggering the point to be skipped.')
+        #     return None, 0.0, (0., 0.), (0., 0.)
         
         # Phase-space point weight to return
         wgt = 1.0
@@ -400,16 +402,16 @@ class FlatInvertiblePhasespace(VirtualPhaseSpaceGenerator):
                 wgt *= (tau_max-tau_min)
 
             # And we can now rescale ycm appropriately
-            ycm_min = 0.5 * math.log(PDF_tau)
+            ycm_min = 0.5 * jax.numpy.log(PDF_tau)
             ycm_max = -ycm_min
             PDF_ycm = ycm_min + (ycm_max - ycm_min)*PDF_ycm            
             # and account for the corresponding Jacobian
             wgt *= (ycm_max - ycm_min)
 
-            xb_1 = math.sqrt(PDF_tau) * math.exp(PDF_ycm)
-            xb_2 = math.sqrt(PDF_tau) * math.exp(-PDF_ycm)
+            xb_1 = jax.numpy.sqrt(PDF_tau) * jax.numpy.exp(PDF_ycm)
+            xb_2 = jax.numpy.sqrt(PDF_tau) * jax.numpy.exp(-PDF_ycm)
             # /!\ The mass of initial state momenta is neglected here.
-            E_cm = math.sqrt(xb_1*xb_2)*self.collider_energy
+            E_cm = jax.numpy.sqrt(xb_1*xb_2)*self.collider_energy
 
         elif self.beam_types[0]==self.beam_types[1]==0:
             xb_1 = 1.
@@ -435,9 +437,10 @@ class FlatInvertiblePhasespace(VirtualPhaseSpaceGenerator):
         assert (len(random_variables)==self.nDimPhaseSpace())
 
         # Make sure that none of the random_variables is NaN.
-        if any(math.isnan(rv) for rv in random_variables):
-            raise PhaseSpaceGeneratorError("Some of the random variables passed "+
-              "to the phase-space generator are NaN: %s"%str(random_variables))
+        # Lukas: not part of computation ignore for now
+        # if jax.numpy.any(jax.numpy.isnan(random_variables)):
+        #     raise PhaseSpaceGeneratorError("Some of the random variables passed "+
+        #       "to the phase-space generator are NaN: %s"%str(random_variables))
 
         # The distribution weight of the generate PS point
         weight = 1.
@@ -450,8 +453,8 @@ class FlatInvertiblePhasespace(VirtualPhaseSpaceGenerator):
                 raise InvalidCmd("1 > 1 phase-space generation not supported.")
             if mass/E_cm < 1.e-7 or ((E_cm-mass)/mass) > 1.e-7:
                 raise PhaseSpaceGeneratorError("1 > 2 phase-space generation needs a final state mass equal to E_c.o.m.")
-            output_momenta.append(LorentzVector([mass/2., 0., 0., +mass/2.]))
-            output_momenta.append(LorentzVector([mass/2., 0., 0., -mass/2.]))
+            output_momenta.append(LorentzVector([mass/2., 0., 0., 1.0*mass/2.]))
+            output_momenta.append(LorentzVector([mass/2., 0., 0., (-1.0)*mass/2.]))
             output_momenta.append(LorentzVector([mass   , 0., 0.,       0.]))
             weight = self.get_flatWeights(E_cm, 1)
             return output_momenta, weight
@@ -474,13 +477,14 @@ class FlatInvertiblePhasespace(VirtualPhaseSpaceGenerator):
             q = 4.*M[i-self.n_initial]*self.rho(
                 M[i-self.n_initial],M[i-self.n_initial+1],self.masses[i-self.n_initial] )
             cos_theta = 2.*random_variables[self.n_final-2+2*(i-self.n_initial)]-1.
-            sin_theta = math.sqrt(1.-cos_theta**2)
+            sin_theta = jax.numpy.sqrt(1.-cos_theta**2)
             phi = 2.*math.pi*random_variables[self.n_final-1+2*(i-self.n_initial)]
-            cos_phi = math.cos(phi)
-            sin_phi = math.sqrt(1.-cos_phi**2)
+            cos_phi = jax.numpy.cos(phi)
+            sin_phi = jax.numpy.sqrt(1.-cos_phi**2)
 
-            if (phi > math.pi):
-                sin_phi = -sin_phi
+            sin_phi = jax.numpy.where(phi > math.pi, -sin_phi,sin_phi)
+            # if (phi > math.pi):
+            #     sin_phi = -sin_phi
             
             p = LorentzVector([0., q*sin_theta*cos_phi, q*sin_theta*sin_phi, q*cos_theta])
             p.set_square(self.masses[i-self.n_initial]**2)
@@ -503,7 +507,7 @@ class FlatInvertiblePhasespace(VirtualPhaseSpaceGenerator):
         
         for i in range(2, self.n_final):
             u = self.bisect(random_variables[i-2], self.n_final-1-i)
-            M[i-1] = math.sqrt(u*(M[i-2]**2))
+            M[i-1] = jax.numpy.sqrt(u*(M[i-2]**2))
 
         return self.get_flatWeights(E_cm,self.n_final)
    
@@ -530,7 +534,7 @@ class FlatInvertiblePhasespace(VirtualPhaseSpaceGenerator):
         for i in range(2,self.n_final):
             weight *= (self.rho(M[i-2],M[i-1],self.masses[i-2]) / self.rho(K[i-2],K[i-1],0.)) * (M[i-1]/K[i-1])
 
-        weight *= math.pow(K[0]/M[0],2*self.n_final-4)
+        weight *= jax.numpy.power(K[0]/M[0],2*self.n_final-4)
 
         return weight
 
@@ -569,7 +573,7 @@ class FlatInvertiblePhasespace(VirtualPhaseSpaceGenerator):
             # BALDY another copy? moms not used afterwards
             p = LorentzVector(moms[i])
             # Take the opposite boost vector
-            boost_vec = -Q[i-self.n_initial].boostVector()
+            boost_vec = -1.0*Q[i-self.n_initial].boostVector()
             p.boost(boost_vec)
             random_variables[self.n_final-2+2*(i-self.n_initial)] = (p.cosTheta()+1.)/2.
             phi = p.phi()
@@ -594,7 +598,7 @@ class FlatInvertiblePhasespace(VirtualPhaseSpaceGenerator):
             weight *= (self.rho(M[i-2],M[i-1],self.masses[i-2])/self.rho(K[i-2],K[i-1],0.)) \
                                                                       * (M[i-1]/K[i-1])
         
-        weight *= math.pow(K[0]/M[0],2*self.n_final-4)
+        weight *= jax.numpy.power(K[0]/M[0],2*self.n_final-4)
 
         return weight
 
@@ -604,8 +608,8 @@ class FlatInvertiblePhasespace(VirtualPhaseSpaceGenerator):
         for i in range(2, self.n_final):
             u = (K[i-1]/K[i-2])**2
             random_variables[i-2] = \
-                (self.n_final+1-i)*math.pow(u,self.n_final-i) - \
-                (self.n_final-i)*math.pow(u, self.n_final+1-i)
+                (self.n_final+1-i)*jax.numpy.power(u,self.n_final-i) - \
+                (self.n_final-i)*jax.numpy.power(u, self.n_final+1-i)
         
         return self.get_flatWeights(E_cm, self.n_final)
 
@@ -619,7 +623,7 @@ if __name__ == '__main__':
     E_cm  = 5000.0
 
     # Try to run the above for a 2->8.
-    my_PS_generator = FlatInvertiblePhasespace([0.]*2, [100. + 10.*i for i in range(8)],
+    my_PS_generator = FlatInvertiblePhasespace([0.]*2, [100. + 10.*i for i in range(2)],
                                             beam_Es =(E_cm/2.,E_cm/2.), beam_types=(0,0))
     # Try to run the above for a 2->1.    
     #    my_PS_generator = FlatInvertiblePhasespace([0.]*2, [5000.0])
@@ -675,7 +679,7 @@ if __name__ == '__main__':
     boost_vector_to_lab_frame = None
     xb_1, xb_2 = 0.25, 0.6
     ref_lab = (momenta[0]*xb_1 + momenta[1]*xb_2)
-    boost_vector_to_lab_frame = -ref_lab.boostVector()
+    boost_vector_to_lab_frame = -1.0*ref_lab.boostVector()
 
     print("then further rescaling with xi1=0.12 and xi2=0.71")
     xi1, xi2 = 0.12, 0.71
@@ -688,7 +692,7 @@ if __name__ == '__main__':
     boost_vector_to_lab_frame += xi_boost
     momenta_boosted_to_com = copy.deepcopy(momenta)
     for p in momenta_boosted_to_com:
-        p.boost(-xi_boost)
+        p.boost(-1.0*xi_boost)
     test_momenta = copy.deepcopy(momenta_boosted_to_com)
 
     print("Final PS point should be in c.o.m:")
@@ -709,8 +713,8 @@ if __name__ == '__main__':
     print("2: %s"%str(momenta[1]))
 
     print("\n Initial state momenta obtained with subsequent bjorken boost:")
-    test_momenta[0].boost(-ref_lab.boostVector())
-    test_momenta[1].boost(-ref_lab.boostVector())
+    test_momenta[0].boost(-1.0*ref_lab.boostVector())
+    test_momenta[1].boost(-1.0*ref_lab.boostVector())
     print("1: %s"%str(test_momenta[0]))
     print("2: %s"%str(test_momenta[1]))
     print(".vs.")

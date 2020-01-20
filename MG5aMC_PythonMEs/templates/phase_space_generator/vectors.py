@@ -168,10 +168,10 @@ class What(object):
 
         b2 = boost_vector.square()
         if gamma < 0.:
-            gamma = 1.0 / math.sqrt(1.0 - b2)
+            gamma = 1.0 / jax.numpy.sqrt(1.0 - b2)
 
         bp = self.space().vector.dot(boost_vector.vector)
-        gamma2 = (gamma-1.0) / b2 if b2 > 0 else 0.
+        gamma2 = jax.numpy.where(b2 > 0,gamma-1.0 / b2, 0.)
         factor = gamma2*bp + gamma*self[0]
         #self.space().vector += factor*boost_vector.vector
         self[1:] += factor*boost_vector.vector
@@ -182,10 +182,10 @@ class What(object):
 
         if self == LorentzVector():
             return Vector([0.] * 3)
-        if self[0] <= 0. or self.square() < 0.:
-            logger.critical("Attempting to compute a boost vector from")
-            logger.critical("%s (%.9e)" % (str(self), self.square()))
-            raise InvalidOperation
+        # if self[0] <= 0. or self.square() < 0.:
+        #     logger.critical("Attempting to compute a boost vector from")
+        #     logger.critical("%s (%.9e)" % (str(self), self.square()))
+        #     raise InvalidOperation
         return self.space()/self[0]
 
     def cosTheta(self):
